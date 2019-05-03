@@ -315,7 +315,7 @@ class Hebbian(LearningRule):
         sj = self.connection.target.summed_spikes
 
         # this could probably be more efficient
-        self.connection.w[torch.ger(source_s, target_s).byte()] += torch.ger(si-sm, sj-sm)[torch.ger(source_s, target_s).byte()]
+        self.connection.w[torch.ger(source_s, target_s).byte()] += self.nu[0] * torch.ger(si-sm, sj-sm)[torch.ger(source_s, target_s).byte()]
 
         super().update()
 
