@@ -305,13 +305,12 @@ class Hebbian(LearningRule):
         Hebbian learning rule for ``Connection`` subclass of ``AbstractConnection`` class.
         """
         # update the locations of spikes based on the update rule h(si-sm)(sj-sm)
-        si = self.connection.source.summed_spikes
-        sj = self.connection.target.summed_spikes
-        
+        si = torch.sum(self.connection.source.summed_spikes)
+        sj = torch.sum(self.connection.target.summed_spikes)
         sm = torch.sum(sm)
         
         # this could probably be more efficient
-        self.connection.w += self.nu[0] * torch.ger(si-sm, sj-sm)
+        self.connection.w += self.nu[0]*(si-sm)*(sj-sm)
 
         super().update()
 
