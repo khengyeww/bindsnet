@@ -6,10 +6,10 @@ from scipy.spatial.distance import euclidean
 from torch.nn.modules.utils import _pair
 
 from learning import SymPostPre
+from node import SLNodes
 from bindsnet.network import Network
 from bindsnet.network.nodes import Input, DiehlAndCookNodes
 from bindsnet.network.topology import Connection
-#, LocalConnection
 
 
 class HaoAndHuang2019(Network):
@@ -17,12 +17,13 @@ class HaoAndHuang2019(Network):
     """
     Implements the spiking neural network architecture from `(Hao & Huang 2019)
     <https://www.sciencedirect.com/science/article/pii/S0893608019302680>`_.
-    which is modified from DiehlAndCook2015v2 network.
+    which is based on DiehlAndCook2015v2 network.
     """
 
     def __init__(
         self,
         n_inpt: int,
+        n_outpt: int,
         n_neurons: int = 100,
         inh: float = 17.5,
         dt: float = 1.0,
@@ -37,10 +38,11 @@ class HaoAndHuang2019(Network):
     ) -> None:
         # language=rst
         """
-        Constructor for class ``DiehlAndCook2015v2``.
+        Constructor for class ``HaoAndHuang2019``.
 
         :param n_inpt: Number of input neurons. Matches the 1D size of the input data.
         :param n_neurons: Number of excitatory, inhibitory neurons.
+        :param n_outpt: Number of output neurons. Usually is set to the number of labels (classes).
         :param inh: Strength of synapse weights from inhibitory to excitatory layer.
         :param dt: Simulation time step.
         :param nu: Single or pair of learning rates for pre- and post-synaptic events, respectively.
@@ -55,6 +57,7 @@ class HaoAndHuang2019(Network):
         super().__init__(dt=dt)
 
         self.n_inpt = n_inpt
+        self.n_outpt = n_outpt
         self.inpt_shape = inpt_shape
         self.n_neurons = n_neurons
         self.inh = inh
@@ -63,9 +66,8 @@ class HaoAndHuang2019(Network):
         input_layer = Input(
             n=self.n_inpt, shape=self.inpt_shape, traces=True, tc_trace=20.0
         )
-        self.add_layer(input_layer, name="X")
 
-        output_layer = DiehlAndCookNodes(
+        hidden_layer = DiehlAndCookNodes(
             n=self.n_neurons,
             traces=True,
             rest=-65.0,
@@ -77,12 +79,22 @@ class HaoAndHuang2019(Network):
             theta_plus=theta_plus,
             tc_theta_decay=tc_theta_decay,
         )
-        self.add_layer(output_layer, name="Y")
+
+        output_layer = SLNodes(
+            n=self.n_outpt,
+            traces=False,
+            rest=-60.0,
+            reset=-45.0,
+            thresh=-40.0,
+            tc_decay=10.0,
+            refrac=2,
+            tc_trace=20.0,
+        )
 
         w = 0.3 * torch.rand(self.n_inpt, self.n_neurons)
         input_connection = Connection(
-            source=self.layers["X"],
-            target=self.layers["Y"],
+            source=input_layer,
+            target=hidden_layer,
             w=w,
             update_rule=SymPostPre,
             nu=nu,
@@ -91,17 +103,36 @@ class HaoAndHuang2019(Network):
             wmax=wmax,
             norm=norm,
         )
-        self.add_connection(input_connection, source="X", target="Y")
 
         w = -self.inh * (
             torch.ones(self.n_neurons, self.n_neurons)
             - torch.diag(torch.ones(self.n_neurons))
         )
         recurrent_connection = Connection(
-            source=self.layers["Y"],
-            target=self.layers["Y"],
+            source=hidden_layer,
+            target=hidden_layer,
             w=w,
             wmin=-self.inh,
             wmax=0,
         )
+
+        w = 0.3 * torch.rand(self.n_neurons, self.n_outpt)
+        output_connection = Connection(
+            source=hidden_layer,
+            target=output_layer,
+            w=w,
+            #update_rule=SymPostPre,
+            nu=nu,
+            reduction=reduction,
+            wmin=wmin,
+            wmax=wmax,
+            norm=norm,
+        )
+
+        # Add to network
+        self.add_layer(input_layer, name="X")
+        self.add_layer(hidden_layer, name="Y")
+        self.add_layer(output_layer, name="Z")
+        self.add_connection(input_connection, source="X", target="Y")
         self.add_connection(recurrent_connection, source="Y", target="Y")
+        self.add_connection(output_connection, source="Y", target="Z")

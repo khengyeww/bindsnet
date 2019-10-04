@@ -84,6 +84,7 @@ start_intensity = intensity
 network = HaoAndHuang2019(
     n_inpt=784,
     n_neurons=n_neurons,
+    n_outpt=10,
     inh=inh,
     dt=dt,
     norm=78.4,
@@ -219,7 +220,7 @@ for epoch in range(n_epochs):
             labels = []
 
         labels.append(batch["label"])
-
+        
         # Run the network on the input.
         network.run(inpts=inpts, time=time, input_time_dim=1)
 
@@ -243,13 +244,12 @@ for epoch in range(n_epochs):
             voltages = {"Y": exc_voltages}
             #
             inpt_axes, inpt_ims = plot_input(
-                image, inpt, label=labels[step], axes=inpt_axes, ims=inpt_ims
+                image, inpt, label=labels[step % update_interval], axes=inpt_axes, ims=inpt_ims
             )
             spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
             weights_im = plot_weights(square_weights, im=weights_im)
             assigns_im = plot_assignments(square_assignments, im=assigns_im)
             perf_ax = plot_performance(accuracy, ax=perf_ax)
-            print("checkouttttt")
             voltage_ims, voltage_axes = plot_voltages(
                 voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
             )
